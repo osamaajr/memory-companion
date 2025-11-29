@@ -57,33 +57,66 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Custom colors for the app
+        overlay: {
+          bg: "hsl(var(--overlay-bg))",
+          text: "hsl(var(--overlay-text))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)",
+        "2xl": "calc(var(--radius) + 8px)",
+      },
+      fontSize: {
+        // Accessibility-focused sizes
+        "xs": ["0.875rem", { lineHeight: "1.4" }],
+        "sm": ["1rem", { lineHeight: "1.5" }],
+        "base": ["1.125rem", { lineHeight: "1.6" }],
+        "lg": ["1.25rem", { lineHeight: "1.5" }],
+        "xl": ["1.5rem", { lineHeight: "1.4" }],
+        "2xl": ["1.875rem", { lineHeight: "1.3" }],
+        "3xl": ["2.25rem", { lineHeight: "1.2" }],
+        "4xl": ["3rem", { lineHeight: "1.1" }],
+      },
+      spacing: {
+        "safe-top": "env(safe-area-inset-top)",
+        "safe-bottom": "env(safe-area-inset-bottom)",
+        "safe-left": "env(safe-area-inset-left)",
+        "safe-right": "env(safe-area-inset-right)",
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.6" },
+        },
+        "scanning": {
+          "0%": { transform: "translateY(0%)" },
+          "100%": { transform: "translateY(100%)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "scanning": "scanning 2s ease-in-out infinite",
+      },
+      boxShadow: {
+        soft: "var(--shadow-soft)",
+        card: "var(--shadow-card)",
+        overlay: "var(--shadow-overlay)",
       },
     },
   },

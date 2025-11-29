@@ -202,6 +202,19 @@ serve(async (req) => {
     const { faceMatches, error: rekError } = await searchFacesByImage(bytes);
 
     if (rekError) {
+      // Parse AWS error to give user-friendly response
+      try {
+        const awsError = JSON.parse(rekError);
+        if (awsError.__type === "InvalidParameterException" && awsError.Message?.includes("no faces")) {
+          console.log("No face detected in image");
+          return new Response(
+            JSON.stringify({ personId: null, message: "No face detected in image" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch {
+        // Not JSON, continue with generic error
+      }
       return new Response(
         JSON.stringify({ error: rekError }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

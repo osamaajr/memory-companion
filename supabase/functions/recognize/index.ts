@@ -1,13 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { RekognitionClient, SearchFacesByImageCommand } from "https://esm.sh/@aws-sdk/client-rekognition@3.540.0";
+import { RekognitionClient, SearchFacesByImageCommand } from "npm:@aws-sdk/client-rekognition";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// AWS CONFIG
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("SB_URL") ?? "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Supabase env vars missing");
+}
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const rekognition = new RekognitionClient({
   region: Deno.env.get("AWS_REGION"),
   credentials: {
@@ -16,13 +22,10 @@ const rekognition = new RekognitionClient({
   },
 });
 
-// SUPABASE CONFIG
-const supabaseUrl = Deno.env.get("SB_URL")!;
-const supabaseKey = Deno.env.get("SB_SERVICE_ROLE_KEY")!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const collectionId = Deno.env.get("REKOGNITION_COLLECTION_ID") ?? Deno.env.get("AWS_COLLECTION_ID") ?? "";
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -30,30 +33,30 @@ serve(async (req) => {
   try {
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
-      return new Response(JSON.stringify({ error: "Invalid content type" }), {
-        headers: corsHeaders,
+      return new Response(JSON.stringify({ error: "Expected multipart/form-data" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Parse multipart form
     const form = await req.formData();
     const imageFile = form.get("image") as File | null;
 
     if (!imageFile) {
       return new Response(JSON.stringify({ error: "No image provided" }), {
-        headers: corsHeaders,
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Convert file → bytes
+    // File -> bytes
     const arrayBuffer = await imageFile.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    console.log("Image received. Calling AWS Rekognition...");
+    console.log("Image received, calling Rekognition...");
 
-    // Call AWS Rekognition collection
     const command = new SearchFacesByImageCommand({
-      CollectionId: Deno.env.get("REKOGNITION_COLLECTION_ID")!,
+      CollectionId: collectionId,
       Image: { Bytes: bytes },
       FaceMatchThreshold: 85,
       MaxFaces: 1,
@@ -62,14 +65,30 @@ serve(async (req) => {
     const result = await rekognition.send(command);
 
     if (!result.FaceMatches || result.FaceMatches.length === 0) {
-      return new Response(JSON.stringify({ personId: null, message: "No match" }), {
-        headers: corsHeaders,
-      });
+      console.log("No face match");
+      return new Response(
+        JSON.stringify({
+          personId: null,
+          message: "No matching face found",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    // Get the matched ExternalImageId
-    const externalId = result.FaceMatches[0].Face!.ExternalImageId!;
-    console.log("AWS matched external_id =", externalId);
+    const match = result.FaceMatches[0];
+    const externalId = match.Face?.ExternalImageId;
+
+    console.log("Matched external_id:", externalId);
+
+    if (!externalId) {
+      return new Response(
+        JSON.stringify({
+          personId: null,
+          message: "Match had no external_id",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Look up person in Supabase
     const { data: person, error } = await supabase
@@ -80,17 +99,48 @@ serve(async (req) => {
 
     if (error) {
       console.error("Supabase error:", error);
+      return new Response(
+        JSON.stringify({
+          personId: null,
+          message: "Database error",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    return new Response(JSON.stringify({ personId: person?.id ?? null }), {
-      headers: corsHeaders,
-    });
+    if (!person) {
+      console.log("No person row for external_id", externalId);
+      return new Response(
+        JSON.stringify({
+          personId: null,
+          message: "Person not registered",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    console.log("Found person id:", person.id);
+
+    return new Response(
+      JSON.stringify({
+        personId: person.id,
+        confidence: match.Similarity ?? null,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
-    console.error("Error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+    console.error("Recognize error:", err);
+    return new Response(
+      JSON.stringify({
+        error: "Recognition failed",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

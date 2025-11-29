@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { RekognitionClient, SearchFacesByImageCommand } from "npm:@aws-sdk/client-rekognition";
+import { RekognitionClient, SearchFacesByImageCommand } from "https://esm.sh/@aws-sdk/client-rekognition@3.540.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,7 +53,7 @@ serve(async (req) => {
 
     // Call AWS Rekognition collection
     const command = new SearchFacesByImageCommand({
-      CollectionId: Deno.env.get("AWS_COLLECTION_ID")!,
+      CollectionId: Deno.env.get("REKOGNITION_COLLECTION_ID")!,
       Image: { Bytes: bytes },
       FaceMatchThreshold: 85,
       MaxFaces: 1,
@@ -87,7 +87,8 @@ serve(async (req) => {
     });
   } catch (err) {
     console.error("Error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: corsHeaders,
     });

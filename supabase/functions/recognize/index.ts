@@ -101,13 +101,23 @@ async function signRequest(
   return headers;
 }
 
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+  return btoa(binary);
+}
+
 async function searchFacesByImage(imageBytes: Uint8Array): Promise<{ faceMatches: any[]; error?: string }> {
   const host = `rekognition.${region}.amazonaws.com`;
   const path = "/";
   const amzTarget = "RekognitionService.SearchFacesByImage";
   
-  // Convert bytes to base64
-  const base64Image = btoa(String.fromCharCode(...imageBytes));
+  // Convert bytes to base64 (chunked to avoid stack overflow)
+  const base64Image = uint8ArrayToBase64(imageBytes);
   
   const requestBody = JSON.stringify({
     CollectionId: collectionId,

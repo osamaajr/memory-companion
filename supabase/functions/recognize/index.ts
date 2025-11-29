@@ -6,49 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Mock external IDs for testing - in real implementation, this would use face recognition
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-serve(async (req) => {
-  try {
-    const data = await req.json();
-
-    // Rekognition sends this
-    const externalId = data.external_id;
-
-    console.log("Received external_id:", externalId);
-
-    if (!externalId) {
-      return new Response(JSON.stringify({ person: null }), {
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    const { data: person, error } = await supabase
-      .from("people")
-      .select("*")
-      .eq("external_id", externalId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Supabase error:", error);
-    }
-
-    return new Response(JSON.stringify({ person }), {
-      headers: { "content-type": "application/json" },
-    });
-  } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ person: null }), {
-      headers: { "content-type": "application/json" },
-    });
-  }
-});
+// Mock external IDs for testing - matches the test data in the people table
+const mockExternalIds = ["PERSON1", "PERSON2", "PERSON3"];
 
 serve(async (req) => {
   // Handle CORS preflight requests

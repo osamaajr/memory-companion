@@ -1,15 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mock person IDs for testing - in real implementation, this would use face recognition
-const mockPersonIds = [
-  'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // Sarah
-  'b2c3d4e5-f6a7-8901-bcde-f12345678901', // Michael
-  'c3d4e5f6-a7b8-9012-cdef-123456789012', // Dr. Emily Chen
+// Mock external IDs for testing - in real implementation, this would use face recognition
+const mockExternalIds = [
+  'PERSON1',
+  'PERSON2',
+  'PERSON3',
 ];
 
 serve(async (req) => {
@@ -20,6 +21,11 @@ serve(async (req) => {
 
   try {
     console.log('Recognize endpoint called');
+    
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Accept multipart form data with image
     const contentType = req.headers.get('content-type') || '';
@@ -33,24 +39,58 @@ serve(async (req) => {
       }
     }
 
-    // Mock face recognition - randomly return a person or null (no face detected)
+    // Mock face recognition - randomly return an external_id or null (no face detected)
     const shouldRecognize = Math.random() > 0.3; // 70% chance of recognition
     
     if (shouldRecognize) {
-      const randomIndex = Math.floor(Math.random() * mockPersonIds.length);
-      const personId = mockPersonIds[randomIndex];
+      const randomIndex = Math.floor(Math.random() * mockExternalIds.length);
+      const externalId = mockExternalIds[randomIndex];
       
-      console.log(`Mock recognition result: personId = ${personId}`);
+      console.log(`Mock recognition result: external_id = ${externalId}`);
       
-      return new Response(
-        JSON.stringify({ 
-          personId,
-          confidence: 0.85 + Math.random() * 0.14 // Mock confidence between 0.85-0.99
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      // Look up person by external_id
+      const { data: person, error } = await supabase
+        .from('people')
+        .select('id')
+        .eq('external_id', externalId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Database lookup error:', error);
+        return new Response(
+          JSON.stringify({ 
+            personId: null,
+            message: 'Database lookup failed'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      if (person) {
+        console.log(`Found person with id: ${person.id}`);
+        return new Response(
+          JSON.stringify({ 
+            personId: person.id,
+            confidence: 0.85 + Math.random() * 0.14 // Mock confidence between 0.85-0.99
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } else {
+        console.log(`No person found with external_id: ${externalId}`);
+        return new Response(
+          JSON.stringify({ 
+            personId: null,
+            message: 'Person not registered'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     } else {
       console.log('Mock recognition result: no face detected');
       

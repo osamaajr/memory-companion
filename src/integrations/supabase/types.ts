@@ -75,6 +75,7 @@ export type Database = {
       people: {
         Row: {
           created_at: string
+          external_id: string | null
           id: string
           name: string
           photo_url: string | null
@@ -82,6 +83,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          external_id?: string | null
           id?: string
           name: string
           photo_url?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          external_id?: string | null
           id?: string
           name?: string
           photo_url?: string | null
